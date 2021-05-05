@@ -12,7 +12,7 @@
 #define		AD_SYNC_GPIO_PIN	GPIO_PIN_8
 
 uint8_t	ad_start_flag = 0;//AD启动标志
-
+	uint8_t Data[12];
 unsigned char arr1[]={'1','2', '3', '4', '5'};
 uint8_t spi_send_data[12] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 uint8_t spi_recv_data[SPI_BUFFSIZE * SPI_BUFFER_N] = {0};//接收缓冲
@@ -75,7 +75,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PD9 */
   GPIO_InitStruct.Pin = GPIO_PIN_9;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
@@ -134,14 +134,16 @@ void ADS1274_Init(void)
 {
 	MX_GPIO_Init();
 	MX_SPI3_Init();
-	MX_DMA_Init();
+	//MX_DMA_Init();
 	
 }
 
 /*	ADS1274数据准备好中断	*/
 void EXTI9_5_IRQHandler(void)
 {   
-
+	__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_9);
+	SPI_Read_Data();
+	printf("%x %x",Data[0],kanqik[1]);
 }
 
 
@@ -214,9 +216,9 @@ void ADS1274_tcp_send_data(void)
 
 uint8_t SPI_Read_Data(void)
 {
-	uint8_t Data[1];
+
 	
-		HAL_SPI_Receive(&hspi3,Data,1,1000);
+		HAL_SPI_Receive(&hspi3,Data,12,1000);
 	return Data[0];
 }
 

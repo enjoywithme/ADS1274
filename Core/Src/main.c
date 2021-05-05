@@ -46,7 +46,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 
-
+extern SPI_HandleTypeDef hspi3;
 
 /* USER CODE BEGIN PV */
 
@@ -99,12 +99,13 @@ int main(void)
 	printf("\r\n-----This example test tcp echo server------\r\n");	
 	
 	ADS1274_Init();
-  MX_LWIP_Init();
+  //MX_LWIP_Init();
 
   /* USER CODE BEGIN 2 */
 	ADS1274_Start();
   /* USER CODE END 2 */
-
+uint8_t tx_data[12];
+  uint8_t rx_data[12];
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -114,8 +115,8 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 		HAL_Delay(1000);
-
-		printf("%x",SPI_Read_Data());
+		//HAL_SPI_TransmitReceive(&hspi3,(uint8_t*)tx_data,(uint8_t*)rx_data,4,0xFFFF);
+		//printf("%x",SPI_Read_Data());
   }
   /* USER CODE END 3 */
 }
