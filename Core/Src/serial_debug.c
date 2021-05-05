@@ -36,7 +36,7 @@
   #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
 #endif /* __GNUC__ */
 
-	UART_HandleTypeDef huart6;
+UART_HandleTypeDef huart6;
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
