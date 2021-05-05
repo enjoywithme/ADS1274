@@ -30,6 +30,7 @@ static void MX_SPI3_Init(void);
 
 SPI_HandleTypeDef hspi3;
 DMA_HandleTypeDef hdma_spi3_rx;
+DMA_HandleTypeDef hdma_spi3_tx;
 
 /**
   * Enable DMA controller clock
@@ -44,6 +45,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
 
 }
 
@@ -75,7 +79,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PD9 */
   GPIO_InitStruct.Pin = GPIO_PIN_9;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
@@ -84,6 +88,7 @@ static void MX_GPIO_Init(void)
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 }
+
 
 
 /**
@@ -104,7 +109,7 @@ static void MX_SPI3_Init(void)
   /* SPI3 parameter configuration*/
   hspi3.Instance = SPI3;
   hspi3.Init.Mode = SPI_MODE_MASTER;
-  hspi3.Init.Direction = SPI_DIRECTION_2LINES_RXONLY;
+  hspi3.Init.Direction = SPI_DIRECTION_2LINES;
   hspi3.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
@@ -133,17 +138,37 @@ static void MX_SPI3_Init(void)
 void ADS1274_Init(void)
 {
 	MX_GPIO_Init();
+	MX_DMA_Init();
 	MX_SPI3_Init();
-	//MX_DMA_Init();
-	
+
 }
 
 /*	ADS1274数据准备好中断	*/
 void EXTI9_5_IRQHandler(void)
 {   
-	__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_9);
-	SPI_Read_Data();
-	printf("%x %x",Data[0],kanqik[1]);
+	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_9);//自动清除中断标志
+	HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+	//HAL_SPI_Receive(&hspi3,Data,12,1000);
+	//printf("%x %x",Data[0],Data[1]);
+	if(HAL_OK!=HAL_SPI_Receive_DMA(&hspi3,Data,12))
+	{
+		printf("error dma spi3\r\n");
+	}
+	
+}
+
+//SPI DMA接收完成回调
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
+{
+	printf("%x %x %x\r\n",Data[0],Data[1],Data[2]);
+	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+}
+
+
+
+void DMA1_Stream5_IRQHandler(void)		//这里发送和接收要同时配置，否则中断标志位无法清除干净
+{
+  HAL_DMA_IRQHandler(&hdma_spi3_tx);
 }
 
 
