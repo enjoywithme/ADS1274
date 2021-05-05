@@ -21,6 +21,7 @@
 #include "main.h"
 #include "lwip.h"
 #include "stm32f4xx_hal_usart.h"
+#include "serial_debug.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -38,14 +39,14 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi3;
 DMA_HandleTypeDef hdma_spi3_rx;
 
-UART_HandleTypeDef huart6;
+
 
 /* USER CODE BEGIN PV */
 
@@ -55,7 +56,7 @@ UART_HandleTypeDef huart6;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
-static void MX_USART6_UART_Init(void);
+
 static void MX_SPI3_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -93,9 +94,15 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+	
+#ifdef SERIAL_DEBUG 
+	DebugComPort_Init();
+#endif
+	
+	printf("\r\n-----This example test tcp echo server------\r\n");	
+	
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_USART6_UART_Init();
   MX_LWIP_Init();
   MX_SPI3_Init();
   /* USER CODE BEGIN 2 */
@@ -201,38 +208,7 @@ static void MX_SPI3_Init(void)
 
 }
 
-/**
-  * @brief USART6 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART6_UART_Init(void)
-{
 
-  /* USER CODE BEGIN USART6_Init 0 */
-
-  /* USER CODE END USART6_Init 0 */
-
-  /* USER CODE BEGIN USART6_Init 1 */
-
-  /* USER CODE END USART6_Init 1 */
-  huart6.Instance = USART6;
-  huart6.Init.BaudRate = 115200;
-  huart6.Init.WordLength = UART_WORDLENGTH_8B;
-  huart6.Init.StopBits = UART_STOPBITS_1;
-  huart6.Init.Parity = UART_PARITY_NONE;
-  huart6.Init.Mode = UART_MODE_TX_RX;
-  huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart6.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart6) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART6_Init 2 */
-
-  /* USER CODE END USART6_Init 2 */
-
-}
 
 /**
   * Enable DMA controller clock
@@ -295,11 +271,7 @@ static void MX_GPIO_Init(void)
   * @param  None
   * @retval None
   */
-PUTCHAR_PROTOTYPE
-{
-  HAL_UART_Transmit(&huart6, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-  return ch;
-}
+
 
 /* USER CODE END 4 */
 
