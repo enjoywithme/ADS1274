@@ -124,11 +124,18 @@ int main(void)
 
     /* Handle timeouts */
     sys_check_timeouts();
+	
 
 #ifdef USE_DHCP
     /* handle periodic timers for LwIP */
     DHCP_Periodic_Handle(&gnetif);
 #endif 
+		
+		//停止或者启动AD
+		ADS1274_run();
+		
+		//通过TCP发送数据
+		ADS1274_tcp_send_data();
   }
 
   /* USER CODE END 3 */

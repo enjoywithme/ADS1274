@@ -38,31 +38,20 @@
 #include "lwip/debug.h"
 #include "lwip/stats.h"
 #include "lwip/tcp.h"
+#include "tcp_echoserver.h"
 #include <stdio.h>
+#include <string.h>
 
 #if LWIP_TCP
 
+
+
+
+
 static struct tcp_pcb *tcp_echoserver_pcb;
-
-/* ECHO protocol states */
-enum tcp_echoserver_states
-{
-  ES_NONE = 0,
-  ES_ACCEPTED,
-  ES_RECEIVED,
-  ES_CLOSING
-};
-
-/* structure for maintaing connection infos to be passed as argument 
-   to LwIP callbacks*/
-struct tcp_echoserver_struct
-{
-  u8_t state;             /* current connection state */
-  u8_t retries;
-  struct tcp_pcb *pcb;    /* pointer on the current tcp_pcb */
-  struct pbuf *p;         /* pointer on the received/to be transmitted pbuf */
-};
-
+struct tcp_echoserver_struct *client_es;//ֻ只接受一个连接
+extern u8_t ad_start_flag;//data_sample中的1274启动标志
+unsigned char welcome_message[] ="Welcome to WDIT\r\n";
 
 static err_t tcp_echoserver_accept(void *arg, struct tcp_pcb *newpcb, err_t err);
 static err_t tcp_echoserver_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
@@ -72,6 +61,46 @@ static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
 static void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
 static void tcp_echoserver_connection_close(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
 
+static void check_recv_data(struct tcp_echoserver_struct *es);
+
+
+
+//从一个接受的客户连接发送数据
+u8_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,u16_t len)
+{
+
+	struct tcp_pcb *tpcb = es->pcb;
+  err_t wr_err = ERR_OK;
+	
+	if(es==NULL || es->state!=ES_ACCEPTED)
+		return 0;
+
+
+ 
+  if ((wr_err == ERR_OK) &&
+         (payload != NULL) && 
+         (len <= tcp_sndbuf(tpcb)))
+  {
+    
+
+    /* enqueue data for transmission */
+    wr_err = tcp_write(tpcb, payload, len, 1);
+    
+    if (wr_err == ERR_OK) {
+      u16_t plen;
+
+      plen = len;
+     
+      /* Update tcp window size to be advertized : should be called when received
+      data (with the amount plen) has been processed by the application layer */
+      tcp_recved(tpcb, plen);
+   } else {
+     return 0;
+   }
+  }
+	
+	return 1;
+}
 
 /**
   * @brief  Initializes the tcp echo server
@@ -100,10 +129,15 @@ void tcp_echoserver_init(void)
     }
     else 
     {
+			printf("Can not bind pcb\n");
       /* deallocate the pcb */
       memp_free(MEMP_TCP_PCB, tcp_echoserver_pcb);
     }
   }
+	else
+	{
+		printf("Can not create new pcb\n");
+	}
 }
 
 /**
@@ -121,6 +155,12 @@ static err_t tcp_echoserver_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
   LWIP_UNUSED_ARG(arg);
   LWIP_UNUSED_ARG(err);
 
+	if(client_es!=NULL)
+	{
+		printf("Only one connection allowed\r\n");
+		return ERR_ABRT;//只允许一个连接
+	}
+	
   /* set priority for the newly accepted tcp connection newpcb */
   tcp_setprio(newpcb, TCP_PRIO_MIN);
 
@@ -146,7 +186,11 @@ static err_t tcp_echoserver_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
     tcp_poll(newpcb, tcp_echoserver_poll, 0);
     
     ret_err = ERR_OK;
-		printf("got client");
+		
+		//保存这个接受的连接
+		client_es = es;
+		
+		tcp_echoserver_send_data(es,welcome_message,strlen((const char *)welcome_message));
   }
   else
   {
@@ -158,6 +202,31 @@ static err_t tcp_echoserver_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
   return ret_err;  
 }
 
+/*解析接收到的数据*/
+static void check_recv_data(struct tcp_echoserver_struct *es)
+{
+	unsigned char * payload;
+	
+	if(es->p->len<2)
+		goto exit;
+	
+	payload = es->p->payload;
+	printf("\r\ngot data\r\n");
+	printf(payload);	
+		
+	if(payload[0]=='!' && payload[1]=='S')
+	{
+		ad_start_flag = 1;
+	}
+	
+	if(payload[0]=='!' && payload[1]=='T')
+	{
+		ad_start_flag = 0;
+	}	
+	exit:
+		pbuf_free(es->p);
+		es->p = NULL;
+}
 
 /**
   * @brief  This function is the implementation for tcp_recv LwIP callback
@@ -211,7 +280,7 @@ static err_t tcp_echoserver_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p
   else if(es->state == ES_ACCEPTED)
   {
     /* first data chunk in p->payload */
-    es->state = ES_RECEIVED;
+    //es->state = ES_RECEIVED; //只允许到ACCEPTED状态
     
     /* store reference to incoming pbuf (chain) */
     es->p = p;
@@ -220,7 +289,10 @@ static err_t tcp_echoserver_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p
     tcp_sent(tpcb, tcp_echoserver_sent);
     
     /* send back the received data (echo) */
-    tcp_echoserver_send(tpcb, es);
+    //tcp_echoserver_send(tpcb, es);
+		
+		//检查收到的数据
+		check_recv_data(es);
     
     ret_err = ERR_OK;
   }
@@ -281,6 +353,9 @@ static void tcp_echoserver_error(void *arg, err_t err)
   {
     /*  free es structure */
     mem_free(es);
+		
+		//因为只有一个客户端链接，置空保存的客户端连接
+		client_es = NULL;
   }
 }
 
@@ -435,6 +510,9 @@ static void tcp_echoserver_connection_close(struct tcp_pcb *tpcb, struct tcp_ech
   if (es != NULL)
   {
     mem_free(es);
+		
+		//因为只有一个客户端链接，置空保存的客户端连接
+		client_es = NULL;
   }  
   
   /* close tcp connection */

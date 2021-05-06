@@ -2,14 +2,16 @@
 #include "main.h"
 #include "stm32f4xx.h"
 #include "stm32f4xx_hal_gpio.h"
+#include "tcp_echoserver.h"
 #include <stdio.h>
 
 #define 	SPI_BUFFSIZE 	12
 #define   SPI_BUFFER_N	    10
-#define 	SPI_DR_BASE 	(SPI3_BASE + 0x0C) //SPI3 数据寄存器地址
 #define		SPI_DMA_STREAM DMA1_Stream0
 #define		AD_SYNC_GPIO GPIOD
 #define		AD_SYNC_GPIO_PIN	GPIO_PIN_8
+
+extern struct tcp_echoserver_struct *client_es;//TCP客户端连接
 
 uint8_t	ad_start_flag = 0;//AD启动标志
 	uint8_t Data[12];
@@ -150,7 +152,9 @@ void EXTI9_5_IRQHandler(void)
 	HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
 	//HAL_SPI_Receive(&hspi3,Data,12,1000);
 	//printf("%x %x",Data[0],Data[1]);
-	if(HAL_OK!=HAL_SPI_Receive_DMA(&hspi3,Data,12))
+	
+	
+	if(HAL_OK!=HAL_SPI_Receive_DMA(&hspi3,spi_recv_data + buffer_recv_index * SPI_BUFFSIZE,SPI_BUFFSIZE))
 	{
 		printf("error dma spi3\r\n");
 	}
@@ -161,6 +165,22 @@ void EXTI9_5_IRQHandler(void)
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
 {
 	//printf("%x %x %x\r\n",Data[0],Data[1],Data[2]);
+	
+	if(buffer_flip==1 && (buffer_recv_index + 1 == buffer_send_index))
+	{
+		buffer_overflow = 1;
+		ad_start_flag = 0;
+		printf("Buffer overflow\r\n");
+		return;
+	}
+	
+	buffer_recv_index++;
+	if(buffer_recv_index == SPI_BUFFER_N)
+	{
+		buffer_recv_index = 0;
+		buffer_flip = 1;
+	}	
+	
 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
 
@@ -246,17 +266,41 @@ void ADS1274_run(void)
 		ADS1274_Start();
 }
 
+//从TCP端口发送数据
 void ADS1274_tcp_send_data(void)
 {
-
-}
-
-uint8_t SPI_Read_Data(void)
-{
-
+	uint16_t	n;//要发送的字节个数
 	
-		HAL_SPI_Receive(&hspi3,Data,12,1000);
-	return Data[0];
+	if(client_es==NULL || client_es->state!=ES_ACCEPTED)
+		return;
+	
+	HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);//关数据准备好中断
+	
+	if(buffer_send_index == buffer_recv_index)
+		goto exit;
+	
+	if(buffer_flip ==1)
+	{
+		n = (SPI_BUFFER_N - buffer_send_index) * SPI_BUFFSIZE;
+		if(tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFSIZE ,n)==1)
+		{
+			buffer_send_index = 0;
+			buffer_flip =0;
+		}
+	}
+	else
+	{
+		n = (buffer_recv_index - buffer_send_index) * SPI_BUFFSIZE;
+		if(tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFSIZE ,n)==1)
+		{
+			buffer_send_index = buffer_recv_index;
+		}
+	}
+	
+	exit:
+		HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);;
 }
+
+
 
 
