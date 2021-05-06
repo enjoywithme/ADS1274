@@ -41,7 +41,7 @@ uint32_t DHCPcoarseTimer = 0;
 /* USER CODE END 1 */
 
 /* Variables Initialization */
-struct netif gnetif;
+extern struct netif gnetif;
 ip4_addr_t ipaddr;
 ip4_addr_t netmask;
 ip4_addr_t gw;
@@ -55,13 +55,19 @@ ip4_addr_t gw;
   */
 void MX_LWIP_Init(void)
 {
+	
+#ifdef USE_DHCP
+  ip_addr_set_zero_ip4(&ipaddr);
+  ip_addr_set_zero_ip4(&netmask);
+  ip_addr_set_zero_ip4(&gw);
+#else
+  IP_ADDR4(&ipaddr,IP_ADDR0,IP_ADDR1,IP_ADDR2,IP_ADDR3);
+  IP_ADDR4(&netmask,NETMASK_ADDR0,NETMASK_ADDR1,NETMASK_ADDR2,NETMASK_ADDR3);
+  IP_ADDR4(&gw,GW_ADDR0,GW_ADDR1,GW_ADDR2,GW_ADDR3);
+#endif /* USE_DHCP */
+	
   /* Initilialize the LwIP stack without RTOS */
   lwip_init();
-
-  /* IP addresses initialization with DHCP (IPv4) */
-  ipaddr.addr = 0;
-  netmask.addr = 0;
-  gw.addr = 0;
 
   /* add the network interface (IPv4/IPv6) without RTOS */
   netif_add(&gnetif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init, &ethernet_input);
@@ -79,14 +85,17 @@ void MX_LWIP_Init(void)
     /* When the netif link is down this function must be called */
     netif_set_down(&gnetif);
   }
-
+	
   /* Set the link callback function, this function is called on change of link status*/
   netif_set_link_callback(&gnetif, ethernetif_update_config);
 
   /* Create the Ethernet link handler thread */
 
   /* Start DHCP negotiation for a network interface (IPv4) */
-  dhcp_start(&gnetif);
+	#ifdef USE_DHCP
+	dhcp_start(&gnetif);
+	#endif
+	
 
 /* USER CODE BEGIN 3 */
 

@@ -164,7 +164,19 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
 
+/**
+  * @brief This function handles DMA1 stream0 global interrupt.
+  */
+void DMA1_Stream0_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Stream0_IRQn 0 */
 
+  /* USER CODE END DMA1_Stream0_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_spi3_rx);
+  /* USER CODE BEGIN DMA1_Stream0_IRQn 1 */
+
+  /* USER CODE END DMA1_Stream0_IRQn 1 */
+}
 
 void DMA1_Stream5_IRQHandler(void)		//这里发送和接收要同时配置，否则中断标志位无法清除干净
 {

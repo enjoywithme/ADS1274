@@ -48,6 +48,9 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
 #define SERIAL_DEBUG 
+//#define USE_LCD        /* enable LCD  */  
+
+
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

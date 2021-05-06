@@ -20,9 +20,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "lwip.h"
-#include "stm32f4xx_hal_usart.h"
+#include "lwip/init.h"
 #include "serial_debug.h"
 #include "data_sample.h"
+#include "app_ethernet.h"
+#include "tcp_echoserver.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -45,11 +47,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-
-extern SPI_HandleTypeDef hspi3;
-
 /* USER CODE BEGIN PV */
-
+struct netif gnetif;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -99,25 +98,39 @@ int main(void)
 	printf("\r\n-----This example test tcp echo server------\r\n");	
 	
 	ADS1274_Init();
-  //MX_LWIP_Init();
-
+	
+	/* Initialize the LwIP stack */
+  MX_LWIP_Init();
+	
+  
+  /* tcp echo server Init */
+  tcp_echoserver_init();
+  
+  /* Notify user about the network interface config */
+  User_notification(&gnetif);
+	
   /* USER CODE BEGIN 2 */
 	ADS1274_Start();
   /* USER CODE END 2 */
-uint8_t tx_data[12];
-  uint8_t rx_data[12];
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-		printf("main \r\n");
-    /* USER CODE END WHILE */
+	printf("Begin to start main loop\r\n");
+	while (1)
+  {  
+    /* Read a received packet from the Ethernet buffers and send it 
+       to the lwIP for handling */
+    ethernetif_input(&gnetif);
 
-    /* USER CODE BEGIN 3 */
-		HAL_Delay(1000);
-		//HAL_SPI_TransmitReceive(&hspi3,(uint8_t*)tx_data,(uint8_t*)rx_data,4,0xFFFF);
-		//printf("%x",SPI_Read_Data());
+    /* Handle timeouts */
+    sys_check_timeouts();
+
+#ifdef USE_DHCP
+    /* handle periodic timers for LwIP */
+    DHCP_Periodic_Handle(&gnetif);
+#endif 
   }
+
   /* USER CODE END 3 */
 }
 
@@ -163,10 +176,6 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 }
-
-
-
-
 
 
 

@@ -418,6 +418,16 @@
               <FileType>1</FileType>
               <FilePath>..\Core\Src\data_sample.c</FilePath>
             </File>
+            <File>
+              <FileName>tcp_echoserver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\tcp_echoserver.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_ethernet.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\app_ethernet.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
