@@ -38,6 +38,7 @@
 #include "lwip/debug.h"
 #include "lwip/stats.h"
 #include "lwip/tcp.h"
+#include <stdio.h>
 
 #if LWIP_TCP
 
@@ -145,6 +146,7 @@ static err_t tcp_echoserver_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
     tcp_poll(newpcb, tcp_echoserver_poll, 0);
     
     ret_err = ERR_OK;
+		printf("got client");
   }
   else
   {

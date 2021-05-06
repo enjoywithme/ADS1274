@@ -48,7 +48,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-struct netif gnetif;
+extern struct netif gnetif;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -110,7 +110,7 @@ int main(void)
   User_notification(&gnetif);
 	
   /* USER CODE BEGIN 2 */
-	ADS1274_Start();
+	//ADS1274_Start();
   /* USER CODE END 2 */
 
   /* Infinite loop */

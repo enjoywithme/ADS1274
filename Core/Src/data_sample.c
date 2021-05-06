@@ -160,7 +160,7 @@ void EXTI9_5_IRQHandler(void)
 //SPI DMA接收完成回调
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
 {
-	printf("%x %x %x\r\n",Data[0],Data[1],Data[2]);
+	//printf("%x %x %x\r\n",Data[0],Data[1],Data[2]);
 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
 

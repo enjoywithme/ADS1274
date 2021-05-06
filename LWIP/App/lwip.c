@@ -41,7 +41,7 @@ uint32_t DHCPcoarseTimer = 0;
 /* USER CODE END 1 */
 
 /* Variables Initialization */
-extern struct netif gnetif;
+struct netif gnetif;
 ip4_addr_t ipaddr;
 ip4_addr_t netmask;
 ip4_addr_t gw;
