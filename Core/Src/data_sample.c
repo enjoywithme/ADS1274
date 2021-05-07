@@ -19,10 +19,8 @@ uint8_t	ad_start_flag = 0;//AD启动标志
 //	uint8_t Data[12];
 
 uint8_t spi_ready=0;
-uint8_t spi_recv_data_1[SPI_BUFFER_SIZE * SPI_BUFFER_N] = {0};//接收缓冲
-uint8_t spi_recv_data_2[SPI_BUFFER_SIZE * SPI_BUFFER_N] = {0};//接收缓冲
+uint8_t spi_recv_data[SPI_BUFFER_SIZE * SPI_BUFFER_N] = {0};//接收缓冲
 
-uint8_t buffer_index=0;
 uint8_t buffer_recv_index = 0;//当前接收缓冲指针
 uint8_t buffer_send_index = 0;//当前发送缓冲指针
 uint8_t buffer_flip = 0;//缓冲指针翻篇
@@ -170,29 +168,28 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
 //		printf(" %x",spi_recv_data[buffer_recv_index*SPI_BUFFER_SIZE + n]);
 //	}
 //	printf("\r\n");
+
+	
+	if(
+		(buffer_flip == 1 && buffer_recv_index + 1 == buffer_send_index)
+		||
+	  (buffer_flip == 0 && buffer_recv_index +1 == SPI_BUFFER_N && buffer_send_index==0)
+	)
+	{
+		buffer_overflow = 1;
+		ad_start_flag = 0;
+		printf("Buffer overflow\r\n");
+		return;
+	}
 	
 	buffer_recv_index++;
 	if(buffer_recv_index == SPI_BUFFER_N)
 	{
-		if(buffer_flip==1)
-		{
-			printf("Buffer overflow\r\n");
-			buffer_overflow = 1;
-			ad_start_flag = 0;
-			return;
-		}
 		buffer_recv_index = 0;
 		buffer_flip = 1;
-		
-		if(buffer_index==0) 
-			buffer_index =1;
-		else 
-			buffer_index=0;
 	}	
 	
-	exit:
-
-		HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
 
 /**
@@ -226,7 +223,7 @@ void ADS1274_Start(void)
 	buffer_send_index = 0;
 	buffer_flip = 0;
 	buffer_overflow = 0;
-	buffer_index = 0;
+
 	spi_ready = 0;
 	
 	HAL_SPI_Abort(&hspi3);
@@ -261,13 +258,7 @@ void ADS1274_read_once(void)
 	if(spi_ready == 0)
 		return;
 	
-	uint8_t* buffer;
-	if(buffer_index==0)
-		buffer = spi_recv_data_1 + buffer_recv_index * SPI_BUFFER_SIZE;
-	else
-		buffer = spi_recv_data_2 + buffer_recv_index * SPI_BUFFER_SIZE;
-	//HAL_StatusTypeDef ret = HAL_SPI_Receive_DMA(&hspi3,spi_recv_data + buffer_recv_index * SPI_BUFFER_SIZE,SPI_BUFFER_SIZE);
-	HAL_StatusTypeDef ret = HAL_SPI_Receive_DMA(&hspi3,buffer,SPI_BUFFER_SIZE);
+	HAL_StatusTypeDef ret = HAL_SPI_Receive_DMA(&hspi3,spi_recv_data + buffer_recv_index * SPI_BUFFER_SIZE,SPI_BUFFER_SIZE);
 	if(HAL_OK!=ret)
 	{
 		printf("error dma spi3:%x\r\n",ret);
@@ -279,26 +270,33 @@ void ADS1274_read_once(void)
 //从TCP端口发送数据
 void ADS1274_tcp_send_data(void)
 {
-	if(buffer_flip==0)
+	uint16_t	n;//要发送的字节个数
+	
+	if(client_es==NULL || client_es->state!=ES_ACCEPTED)
 		return;
 	
-		
 	HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);//关数据准备好中断
 	
-	err_t ret;
-	if(buffer_index==0)
-		ret = tcp_echoserver_send_data(client_es, spi_recv_data_2, SPI_BUFFER_SIZE * SPI_BUFFER_N);
-	else
-		ret = tcp_echoserver_send_data(client_es, spi_recv_data_1, SPI_BUFFER_SIZE * SPI_BUFFER_N);
-	//ret=0;
-	//printf("x");
-	if(ret!=ERR_OK)
+	if(buffer_send_index == buffer_recv_index)
+		goto exit;
+	
+	if(buffer_flip ==1)
 	{
-		//ad_start_flag=0;
-		printf("Error tcp:%d\r\n",ret);
+		n = (SPI_BUFFER_N - buffer_send_index) * SPI_BUFFER_SIZE;
+		if(tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n)==1)
+		{
+			buffer_send_index = 0;
+			buffer_flip =0;
+		}
 	}
 	else
-		buffer_flip=0;
+	{
+		n = (buffer_recv_index - buffer_send_index) * SPI_BUFFER_SIZE;
+		if(tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n)==1)
+		{
+			buffer_send_index = buffer_recv_index;
+		}
+	}
 	
 	exit:
 		HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);;
