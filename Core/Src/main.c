@@ -49,6 +49,7 @@
 
 /* USER CODE BEGIN PV */
 extern struct netif gnetif;
+extern uint8_t	ad_start_flag;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -110,12 +111,13 @@ int main(void)
   User_notification(&gnetif);
 	
   /* USER CODE BEGIN 2 */
-	//ADS1274_Start();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	printf("Begin to start main loop\r\n");
+	ad_start_flag = 0;
 	while (1)
   {  
     /* Read a received packet from the Ethernet buffers and send it 
@@ -135,7 +137,9 @@ int main(void)
 		ADS1274_run();
 		
 		//通过TCP发送数据
-		ADS1274_tcp_send_data();
+		//ADS1274_tcp_send_data();
+		
+		//HAL_Delay(1);
   }
 
   /* USER CODE END 3 */

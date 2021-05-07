@@ -5,7 +5,7 @@
 #include "tcp_echoserver.h"
 #include <stdio.h>
 
-#define 	SPI_BUFFSIZE 	12
+#define 	SPI_BUFFER_SIZE 	12
 #define   SPI_BUFFER_N	    10
 #define		SPI_DMA_STREAM DMA1_Stream0
 #define		AD_SYNC_GPIO GPIOD
@@ -14,20 +14,17 @@
 extern struct tcp_echoserver_struct *client_es;//TCP客户端连接
 
 uint8_t	ad_start_flag = 0;//AD启动标志
-	uint8_t Data[12];
-unsigned char arr1[]={'1','2', '3', '4', '5'};
-uint8_t spi_send_data[12] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-uint8_t spi_recv_data[SPI_BUFFSIZE * SPI_BUFFER_N] = {0};//接收缓冲
+//	uint8_t Data[12];
+
+uint8_t spi_recv_data[SPI_BUFFER_SIZE * SPI_BUFFER_N] = {0};//接收缓冲
 
 uint8_t buffer_recv_index = 0;//当前接收缓冲指针
 uint8_t buffer_send_index = 0;//当前发送缓冲指针
 uint8_t buffer_flip = 0;//缓冲指针翻篇
 uint8_t	buffer_overflow = 0;
 
-static void NVIC_ADS1274(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
-
 static void MX_SPI3_Init(void);
 
 SPI_HandleTypeDef hspi3;
@@ -87,7 +84,7 @@ static void MX_GPIO_Init(void)
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+  //HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 }
 
@@ -153,10 +150,11 @@ void EXTI9_5_IRQHandler(void)
 	//HAL_SPI_Receive(&hspi3,Data,12,1000);
 	//printf("%x %x",Data[0],Data[1]);
 	
-	
-	if(HAL_OK!=HAL_SPI_Receive_DMA(&hspi3,spi_recv_data + buffer_recv_index * SPI_BUFFSIZE,SPI_BUFFSIZE))
+	//HAL_StatusTypeDef ret = HAL_SPI_Receive_DMA(&hspi3,spi_recv_data + buffer_recv_index * SPI_BUFFER_SIZE,SPI_BUFFER_SIZE);
+	HAL_StatusTypeDef ret = HAL_SPI_Receive_DMA(&hspi3,spi_recv_data,SPI_BUFFER_SIZE);
+	if(HAL_OK!=ret)
 	{
-		printf("error dma spi3\r\n");
+		printf("error dma spi3:%x\r\n",ret);
 	}
 	
 }
@@ -164,9 +162,27 @@ void EXTI9_5_IRQHandler(void)
 //SPI DMA接收完成回调
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
 {
-	//printf("%x %x %x\r\n",Data[0],Data[1],Data[2]);
+//	printf("%d -",buffer_recv_index);
+//	uint8_t n;
+//	for(n=0;n<SPI_BUFFER_SIZE;n++)
+//	{
+//		printf(" %x",spi_recv_data[buffer_recv_index*SPI_BUFFER_SIZE + n]);
+//	}
+//	printf("\r\n");
+		if(client_es==NULL || client_es->state!=ES_ACCEPTED)
+			goto exit;
+		if(tcp_echoserver_send_data(client_es, spi_recv_data  ,SPI_BUFFER_SIZE)==1)
+		{
+			buffer_send_index = 0;
+			buffer_flip =0;
+		}
+		goto exit;
 	
-	if(buffer_flip==1 && (buffer_recv_index + 1 == buffer_send_index))
+	if(
+		(buffer_flip == 1 && buffer_recv_index + 1 == buffer_send_index)
+		||
+	  (buffer_flip == 0 && buffer_recv_index +1 == SPI_BUFFER_N && buffer_send_index==0)
+	)
 	{
 		buffer_overflow = 1;
 		ad_start_flag = 0;
@@ -181,7 +197,9 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
 		buffer_flip = 1;
 	}	
 	
-	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+	exit:
+
+		HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
 
 /**
@@ -204,34 +222,6 @@ void DMA1_Stream5_IRQHandler(void)		//这里发送和接收要同时配置，否
 }
 
 
-/* SPI3 DMA RX 完成中断   */
-void SPI_DMA_STREAM_IRQHandler(void)
-{
-//	DMA_Cmd(SPI_DMA_STREAM,DISABLE);
-//	DMA_ClearITPendingBit(SPI_DMA_STREAM,DMA_IT_TCIF0);
-//	DMA_ClearFlag(SPI_DMA_STREAM,DMA_FLAG_TCIF0);
-//	
-//	if(buffer_flip==1 && (buffer_recv_index + 1 == buffer_send_index))
-//	{
-//		buffer_overflow = 1;
-//		ad_start_flag = 0;
-//		return;
-//	}
-//	
-//	buffer_recv_index++;
-//	if(buffer_recv_index == SPI_BUFFER_N)
-//	{
-//		buffer_recv_index = 0;
-//		buffer_flip = 1;
-//	}
-//	
-//	//开始下一次采集
-//	DMA_SetCurrDataCounter(SPI_DMA_STREAM,SPI_BUFFSIZE);
-//	DMA_MemoryTargetConfig(SPI_DMA_STREAM, (uint32_t)spi_recv_data + buffer_recv_index * SPI_BUFFSIZE, DMA_Memory_0);
-//	EXTI9_Enable();
-		
-	
-}
 
 void ADS1274_Start(void)
 {
@@ -241,7 +231,10 @@ void ADS1274_Start(void)
 	
 	buffer_recv_index = 0;
 	buffer_send_index = 0;
+	buffer_flip = 0;
 	buffer_overflow = 0;
+	
+	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 	printf("START\r\n");	
 	HAL_GPIO_WritePin(AD_SYNC_GPIO,AD_SYNC_GPIO_PIN,GPIO_PIN_SET);	//拉低禁止转换，拉高开始转换
@@ -281,8 +274,8 @@ void ADS1274_tcp_send_data(void)
 	
 	if(buffer_flip ==1)
 	{
-		n = (SPI_BUFFER_N - buffer_send_index) * SPI_BUFFSIZE;
-		if(tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFSIZE ,n)==1)
+		n = (SPI_BUFFER_N - buffer_send_index) * SPI_BUFFER_SIZE;
+		if(tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n)==1)
 		{
 			buffer_send_index = 0;
 			buffer_flip =0;
@@ -290,8 +283,8 @@ void ADS1274_tcp_send_data(void)
 	}
 	else
 	{
-		n = (buffer_recv_index - buffer_send_index) * SPI_BUFFSIZE;
-		if(tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFSIZE ,n)==1)
+		n = (buffer_recv_index - buffer_send_index) * SPI_BUFFER_SIZE;
+		if(tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n)==1)
 		{
 			buffer_send_index = buffer_recv_index;
 		}
