@@ -8,12 +8,18 @@
  extern "C" {
 #endif
 
+typedef enum 
+{
+  DE_NO_CONNECTION       = 0x00U,
+  DE_SEND_ERROR    = 0x01U
+
+} DATA_SAMPLE_ERROR_CODE;
  
 void ADS1274_Init(void);
 void ADS1274_Start(void);
 void ADS1274_run(void);
 void ADS1274_tcp_send_data(void);
-uint8_t SPI_Read_Data(void);
+void ADS1274_read_once(void);
 
 #ifdef __cplusplus
  }

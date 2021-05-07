@@ -61,45 +61,31 @@ static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
 static void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
 static void tcp_echoserver_connection_close(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
 
+err_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,unsigned short int len);
 static void check_recv_data(struct tcp_echoserver_struct *es);
 
 
 
 //从一个接受的客户连接发送数据
-u8_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,u16_t len)
+err_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,u16_t len)
 {
 
 	struct tcp_pcb *tpcb = es->pcb;
   err_t wr_err = ERR_OK;
 	
 	if(es==NULL || es->state!=ES_ACCEPTED)
-		return 0;
-
-
- 
-  if ((wr_err == ERR_OK) &&
-         (payload != NULL) && 
-         (len <= tcp_sndbuf(tpcb)))
-  {
-    
-
-    /* enqueue data for transmission */
-    wr_err = tcp_write(tpcb, payload, len, 1);
-    
-    if (wr_err == ERR_OK) {
-      u16_t plen;
-
-      plen = len;
-     
-      /* Update tcp window size to be advertized : should be called when received
-      data (with the amount plen) has been processed by the application layer */
-      tcp_recved(tpcb, plen);
-   } else {
-     return 0;
-   }
-  }
+		return ERR_ARG;
 	
-	return 1;
+	if(len>tcp_sndbuf(tpcb))
+		return ERR_BUF;
+	
+	wr_err = tcp_write(tpcb, payload, len, 0);
+	//if(wr_err == ERR_OK)
+		tcp_output(tpcb);
+	
+	return wr_err;
+
+
 }
 
 /**

@@ -49,6 +49,6 @@ struct tcp_echoserver_struct
 };
 
 void tcp_echoserver_init(void);
-unsigned char tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,unsigned short int len);
+
 
 #endif /* __TCP_ECHOSERVER */

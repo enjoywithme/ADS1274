@@ -136,8 +136,10 @@ int main(void)
 		//停止或者启动AD
 		ADS1274_run();
 		
+		ADS1274_read_once();
+		
 		//通过TCP发送数据
-		//ADS1274_tcp_send_data();
+		ADS1274_tcp_send_data();
 		
 		//HAL_Delay(1);
   }
