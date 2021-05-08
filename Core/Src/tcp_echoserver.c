@@ -62,8 +62,9 @@ static void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_stru
 static void tcp_echoserver_connection_close(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
 
 err_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,unsigned short int len);
+static err_t tcp_echoserver_dataa_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
 static void check_recv_data(struct tcp_echoserver_struct *es);
-
+extern void ADS1274_tcp_send_data(void);
 
 
 //从一个接受的客户连接发送数据
@@ -79,13 +80,33 @@ err_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,u1
 	if(len>tcp_sndbuf(tpcb))
 		return ERR_BUF;
 	
-	wr_err = tcp_write(tpcb, payload, len, 0);
-	//if(wr_err == ERR_OK)
+	//tcp_sent(tpcb, tcp_echoserver_dataa_sent);
+	wr_err = tcp_write(tpcb, payload, len, 1);
+	if(wr_err != ERR_OK)
 		tcp_output(tpcb);
 	
 	return wr_err;
 
 
+}
+
+static err_t tcp_echoserver_dataa_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
+{
+  struct tcp_echoserver_struct *es;
+
+  LWIP_UNUSED_ARG(len);
+
+  es = (struct tcp_echoserver_struct *)arg;
+  es->retries = 0;
+  
+
+    /* if no more data to send and client closed connection*/
+    if(es->state == ES_CLOSING)
+      tcp_echoserver_connection_close(tpcb, es);
+		else
+			ADS1274_tcp_send_data();
+
+  return ERR_OK;
 }
 
 /**

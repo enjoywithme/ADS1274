@@ -154,7 +154,7 @@
           <Type>0</Type>
           <LineNumber>1957</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134225690</Address>
+          <Address>134226230</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
@@ -170,7 +170,7 @@
           <Type>0</Type>
           <LineNumber>1878</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134225626</Address>
+          <Address>134226166</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
@@ -186,7 +186,7 @@
           <Type>0</Type>
           <LineNumber>1762</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134225288</Address>
+          <Address>134225776</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
@@ -196,22 +196,6 @@
           <Filename>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c</Filename>
           <ExecCommand></ExecCommand>
           <Expression>\\myCubeMxConfig\../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c\1762</Expression>
-        </Bp>
-        <Bp>
-          <Number>3</Number>
-          <Type>0</Type>
-          <LineNumber>1930</LineNumber>
-          <EnabledFlag>1</EnabledFlag>
-          <Address>134225606</Address>
-          <ByteObject>0</ByteObject>
-          <HtxType>0</HtxType>
-          <ManyObjects>0</ManyObjects>
-          <SizeOfObject>0</SizeOfObject>
-          <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>1</BreakIfRCount>
-          <Filename>../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c</Filename>
-          <ExecCommand></ExecCommand>
-          <Expression>\\myCubeMxConfig\../Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c\1930</Expression>
         </Bp>
       </Breakpoint>
       <Tracepoint>
