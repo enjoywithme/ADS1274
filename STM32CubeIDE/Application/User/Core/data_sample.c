@@ -6,12 +6,11 @@
 #include "lwip/err.h"
 #include <stdio.h>
 
-#define 	SPI_BUFFER_SIZE 	12
-#define   SPI_BUFFER_N	    30
-#define		SPI_DMA_STREAM DMA1_Stream0
-#define		AD_SYNC_GPIO GPIOD
-#define		AD_SYNC_GPIO_PIN	GPIO_PIN_8
-
+#define SPI_BUFFER_SIZE 	12
+#define SPI_BUFFER_N	    30
+#define	AD_SYNC_GPIO GPIOD
+#define	AD_SYNC_GPIO_PIN	GPIO_PIN_8
+#define	SEND_LINES_LIMIT
 uint8_t ads1274_irq_disable_counter = 0;
 
 extern err_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,unsigned short int len);
@@ -137,10 +136,6 @@ static void MX_SPI3_Init(void)
 
 
 
-
-
-
-
 void ADS1274_Init(void)
 {
 	MX_GPIO_Init();
@@ -165,7 +160,7 @@ void EXTI9_5_IRQHandler(void)
 //SPI DMA接收完成回调
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
 {
-	#ifdef DEBUG
+	#ifdef RECV_DEBUG
 	printf("%d -",buffer_recv_index);
 	uint8_t n;
 	for(n=0;n<SPI_BUFFER_SIZE;n++)
@@ -264,6 +259,8 @@ static void ADS1274_irq_enable(void)
 	
 	if(ads1274_irq_disable_counter==0)
 		HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
+	//printf("irq=%d",ads1274_irq_disable_counter);
 }
 
 static void ADS1274_irq_disable(void)
@@ -272,6 +269,8 @@ static void ADS1274_irq_disable(void)
 	
 	if(ads1274_irq_disable_counter>0)
 		HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+
+	//printf("irq=%d",ads1274_irq_disable_counter);
 }
 
 
@@ -307,70 +306,73 @@ void ADS1274_tcp_send_data(void)
 	uint8_t tcp_lines=5;
 	if(buffer_flip ==1)
 	{
+
+#ifdef	SEND_LINES_LIMIT
 		if(SPI_BUFFER_N - buffer_send_index > tcp_lines)
 		{
 			n = tcp_lines * SPI_BUFFER_SIZE;
 			ret = tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n);
 			if(ret==ERR_OK)
 			{
-				#ifdef DEBUG
+				#ifdef SEND_DEBUG
 				printf("flip=1 r=%d s=%d\r\n",buffer_recv_index,buffer_send_index);
 				#endif
 				buffer_send_index += tcp_lines;
 			}
-			else
-				printf("e-%d\r\n",ret);
 		}
 		else
+#endif
 		{
 			n = (SPI_BUFFER_N - buffer_send_index) * SPI_BUFFER_SIZE;
 			ret = tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n);
 			if(ret==ERR_OK)
 			{
-				#ifdef DEBUG
+				#ifdef SEND_DEBUG
 				printf("flip=1 r=%d s=%d\r\n",buffer_recv_index,buffer_send_index);
 				#endif
 				buffer_send_index = 0;
 				buffer_flip =0;
 			}
-			else
-				printf("e-%d\r\n",ret);
 		}
 
 	}
 	else
 	{
+#ifdef	SEND_LINES_LIMIT
 		if(buffer_recv_index - buffer_send_index > tcp_lines)
 		{
 			n = tcp_lines * SPI_BUFFER_SIZE;
 			ret = tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n);
 			if(ret==ERR_OK)
 			{
-				#ifdef DEBUG
+				#ifdef SEND_DEBUG
 				printf("flip=1 r=%d s=%d\r\n",buffer_recv_index,buffer_send_index);
 				#endif
 				buffer_send_index += tcp_lines;
 			}
-			else
-				printf("e-%d\r\n",ret);
 		}
 		else
+#endif
 		{
 			n = (buffer_recv_index - buffer_send_index) * SPI_BUFFER_SIZE;
 			ret = tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n);
 			if(ret ==ERR_OK)
 			{
-				#ifdef DEBUG
+				#ifdef SEND_DEBUG
 				printf("flip=0 r=%d s=%d\r\n",buffer_recv_index,buffer_send_index);
 				#endif
 				buffer_send_index = buffer_recv_index;
 			}
-			else
-				printf("e-%d\r\n",ret);			
+
 		}
 
 	}
 	
+#ifdef SEND_DEBUG
+	if(ret != ERR_OK)
+		printf("e-%d\r\n",ret);
+#endif
+
 	exit:
 		ADS1274_irq_enable();
 }

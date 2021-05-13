@@ -144,10 +144,10 @@ int main(void)
 		
 		//通过TCP发送数据
 		uint8_t n;
-		for(n=0;n<4;n++)
+		for(n=0;n<3;n++)
 			ADS1274_tcp_send_data();
 		
-		//HAL_Delay(1);
+		HAL_Delay(1);//没有这一行会因为开关中断不匹配导致1274总是被屏蔽，为什么？
   }
 
   /* USER CODE END 3 */
