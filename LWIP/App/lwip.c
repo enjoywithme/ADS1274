@@ -55,13 +55,18 @@ ip4_addr_t gw;
   */
 void MX_LWIP_Init(void)
 {
-  /* Initilialize the LwIP stack without RTOS */
-  lwip_init();
+#ifdef USE_DHCP
+  ip_addr_set_zero_ip4(&ipaddr);
+  ip_addr_set_zero_ip4(&netmask);
+  ip_addr_set_zero_ip4(&gw);
+#else
+  IP_ADDR4(&ipaddr,IP_ADDR0,IP_ADDR1,IP_ADDR2,IP_ADDR3);
+  IP_ADDR4(&netmask,NETMASK_ADDR0,NETMASK_ADDR1,NETMASK_ADDR2,NETMASK_ADDR3);
+  IP_ADDR4(&gw,GW_ADDR0,GW_ADDR1,GW_ADDR2,GW_ADDR3);
+#endif /* USE_DHCP */
 
-  /* IP addresses initialization with DHCP (IPv4) */
-  ipaddr.addr = 0;
-  netmask.addr = 0;
-  gw.addr = 0;
+	/* Initilialize the LwIP stack without RTOS */
+  lwip_init();
 
   /* add the network interface (IPv4/IPv6) without RTOS */
   netif_add(&gnetif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init, &ethernet_input);
