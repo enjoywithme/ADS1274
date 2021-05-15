@@ -156,7 +156,7 @@ void EXTI9_5_IRQHandler(void)
 
 	
 }
-
+//#define RECV_DEBUG
 //SPI DMA接收完成回调
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
 {

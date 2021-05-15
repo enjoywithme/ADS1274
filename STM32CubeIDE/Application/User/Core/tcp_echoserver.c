@@ -197,7 +197,7 @@ static err_t tcp_echoserver_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
 		//保存这个接受的连接
 		client_es = es;
 		
-		tcp_echoserver_send_data(es,welcome_message,strlen((const char *)welcome_message));
+		//tcp_echoserver_send_data(es,welcome_message,strlen((const char *)welcome_message));
   }
   else
   {
