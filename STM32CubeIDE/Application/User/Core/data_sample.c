@@ -3,6 +3,7 @@
 #include "stm32f4xx.h"
 #include "stm32f4xx_hal_gpio.h"
 #include "tcp_echoserver.h"
+#include "lwip/pbuf.h"
 #include "lwip/err.h"
 #include <stdio.h>
 
@@ -14,6 +15,7 @@
 uint8_t ads1274_irq_disable_counter = 0;
 
 extern err_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,unsigned short int len);
+void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
 extern struct tcp_echoserver_struct *client_es;//TCP客户端连接
 
 uint8_t	ad_start_flag = 0;//AD启动标志
@@ -21,6 +23,7 @@ uint8_t	ad_start_flag = 0;//AD启动标志
 
 uint8_t spi_ready=0;
 uint8_t spi_recv_data[SPI_BUFFER_SIZE * SPI_BUFFER_N] = {0};//接收缓冲
+struct pbuf* current_pbuf;
 
 uint8_t buffer_recv_index = 0;//当前接收缓冲指针
 uint8_t buffer_send_index = 0;//当前发送缓冲指针
@@ -152,12 +155,14 @@ void EXTI9_5_IRQHandler(void)
 	//HAL_SPI_Receive(&hspi3,Data,12,1000);
 	//printf("%x %x",Data[0],Data[1]);
 	
-	spi_ready = 1;
-
+	//spi_ready = 1;
+	ADS1274_read_once();
 	
 }
 //#define RECV_DEBUG
 //SPI DMA接收完成回调
+uint16_t pbufs=0;
+uint16_t callbacks=0;
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
 {
 	#ifdef RECV_DEBUG
@@ -169,27 +174,54 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef * hspi)
 	}
 	printf("\r\n");
 	#endif
-	
-	if(
-		(buffer_flip == 1 && buffer_recv_index + 1 == buffer_send_index)
-		||
-	  (buffer_flip == 0 && buffer_recv_index +1 == SPI_BUFFER_N && buffer_send_index==0)
-	)
+	callbacks++;
+	if(current_pbuf == NULL)
 	{
-		buffer_overflow = 1;
-		ad_start_flag = 0;
-		printf("Buffer overflow\r\n");
-		return;
+		pbufs++;
+
+		current_pbuf = pbuf_alloc(PBUF_TRANSPORT,SPI_BUFFER_SIZE * SPI_BUFFER_N,PBUF_RAM);
+		printf("allocated:%d - %X\r\n",pbufs,current_pbuf);
 	}
-	
+	if(current_pbuf==NULL)
+	{
+		printf("Failed to allocate pbuf\r\n");
+		goto error_exit;
+	}
+
+	//memcpy(spi_recv_data,current_pbuf->payload + buffer_recv_index * SPI_BUFFER_SIZE,SPI_BUFFER_SIZE);
+	if(ERR_OK != pbuf_take_at(current_pbuf,spi_recv_data,SPI_BUFFER_SIZE,buffer_recv_index * SPI_BUFFER_SIZE))
+	{
+		printf("Failed to copy data\r\n");
+		goto error_exit;
+	}
 	buffer_recv_index++;
 	if(buffer_recv_index == SPI_BUFFER_N)
 	{
+		current_pbuf->len = SPI_BUFFER_SIZE * SPI_BUFFER_N;
+		current_pbuf->tot_len = current_pbuf->len;
+
+		if(client_es->p==NULL)
+		{
+			pbuf_ref(current_pbuf);
+			client_es->p =current_pbuf;
+			printf("set:%X\r\n",current_pbuf);
+		}
+		else
+		{
+			pbuf_chain(client_es->p,current_pbuf);
+			printf("chain:%X\r\n",current_pbuf);
+		}
+
 		buffer_recv_index = 0;
-		buffer_flip = 1;
-	}	
-	
+		current_pbuf = NULL;
+	}
+
+
 	ADS1274_irq_enable();
+	return;
+
+	error_exit:
+		ad_start_flag = 0;
 }
 
 /**
@@ -228,6 +260,20 @@ void ADS1274_Start(void)
 	ads1274_irq_disable_counter =0;
 	
 	HAL_SPI_Abort(&hspi3);
+
+	//释放未发送的pbuf
+	u8_t freed;
+	if(client_es != NULL && client_es->p != NULL)
+	{
+		do
+		{
+		    /* try hard to free pbuf */
+			freed = pbuf_free(client_es->p);
+		}
+		while(freed == 0);
+		printf("start-freed:%d",freed);
+	}
+
 	ADS1274_irq_enable();
 
 	printf("START\r\n");	
@@ -277,14 +323,16 @@ static void ADS1274_irq_disable(void)
 //读取一次1274数据
 void ADS1274_read_once(void)
 {
-	if(spi_ready == 0)
-		return;
+//	if(spi_ready == 0)
+//		return;
 	
-	HAL_StatusTypeDef ret = HAL_SPI_Receive_DMA(&hspi3,spi_recv_data + buffer_recv_index * SPI_BUFFER_SIZE,SPI_BUFFER_SIZE);
+	//HAL_StatusTypeDef ret = HAL_SPI_Receive_DMA(&hspi3,spi_recv_data + buffer_recv_index * SPI_BUFFER_SIZE,SPI_BUFFER_SIZE);
+	HAL_StatusTypeDef ret = HAL_SPI_Receive_DMA(&hspi3,spi_recv_data,SPI_BUFFER_SIZE);
 	if(HAL_OK!=ret)
 	{
 		printf("error dma spi3:%x\r\n",ret);
 	}
+
 	
 	spi_ready = 0;
 }
@@ -297,84 +345,8 @@ void ADS1274_tcp_send_data(void)
 	if(client_es==NULL || client_es->state!=ES_ACCEPTED)
 		return;
 	
-	ADS1274_irq_disable();//关数据准备好中断
-	
-	if(buffer_send_index == buffer_recv_index)
-		goto exit;
-	
-	err_t ret;
-	uint8_t tcp_lines=5;
-	if(buffer_flip ==1)
-	{
+	tcp_echoserver_send(client_es->pcb,client_es);
 
-#ifdef	SEND_LINES_LIMIT
-		if(SPI_BUFFER_N - buffer_send_index > tcp_lines)
-		{
-			n = tcp_lines * SPI_BUFFER_SIZE;
-			ret = tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n);
-			if(ret==ERR_OK)
-			{
-				#ifdef SEND_DEBUG
-				printf("flip=1 r=%d s=%d\r\n",buffer_recv_index,buffer_send_index);
-				#endif
-				buffer_send_index += tcp_lines;
-			}
-		}
-		else
-#endif
-		{
-			n = (SPI_BUFFER_N - buffer_send_index) * SPI_BUFFER_SIZE;
-			ret = tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n);
-			if(ret==ERR_OK)
-			{
-				#ifdef SEND_DEBUG
-				printf("flip=1 r=%d s=%d\r\n",buffer_recv_index,buffer_send_index);
-				#endif
-				buffer_send_index = 0;
-				buffer_flip =0;
-			}
-		}
-
-	}
-	else
-	{
-#ifdef	SEND_LINES_LIMIT
-		if(buffer_recv_index - buffer_send_index > tcp_lines)
-		{
-			n = tcp_lines * SPI_BUFFER_SIZE;
-			ret = tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n);
-			if(ret==ERR_OK)
-			{
-				#ifdef SEND_DEBUG
-				printf("flip=1 r=%d s=%d\r\n",buffer_recv_index,buffer_send_index);
-				#endif
-				buffer_send_index += tcp_lines;
-			}
-		}
-		else
-#endif
-		{
-			n = (buffer_recv_index - buffer_send_index) * SPI_BUFFER_SIZE;
-			ret = tcp_echoserver_send_data(client_es, spi_recv_data + buffer_send_index * SPI_BUFFER_SIZE ,n);
-			if(ret ==ERR_OK)
-			{
-				#ifdef SEND_DEBUG
-				printf("flip=0 r=%d s=%d\r\n",buffer_recv_index,buffer_send_index);
-				#endif
-				buffer_send_index = buffer_recv_index;
-			}
-
-		}
-
-	}
-	
-#ifdef SEND_DEBUG
-	if(ret != ERR_OK)
-		printf("e-%d\r\n",ret);
-#endif
-
-	exit:
-		ADS1274_irq_enable();
 }
 
 

@@ -58,7 +58,7 @@ static err_t tcp_echoserver_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p
 static void tcp_echoserver_error(void *arg, err_t err);
 static err_t tcp_echoserver_poll(void *arg, struct tcp_pcb *tpcb);
 static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
-static void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
+void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
 static void tcp_echoserver_connection_close(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
 
 err_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,unsigned short int len);
@@ -420,12 +420,12 @@ static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
 
   es = (struct tcp_echoserver_struct *)arg;
   es->retries = 0;
-  
+  printf("sent:%d\r\n",len);
   if(es->p != NULL)
   {
     /* still got pbufs to send */
     tcp_sent(tpcb, tcp_echoserver_sent);
-    tcp_echoserver_send(tpcb, es);
+    //tcp_echoserver_send(tpcb, es);
   }
   else
   {
@@ -443,11 +443,11 @@ static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
   * @param  es: pointer on echo_state structure
   * @retval None
   */
-static void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es)
+ void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es)
 {
   struct pbuf *ptr;
   err_t wr_err = ERR_OK;
- 
+
   while ((wr_err == ERR_OK) &&
          (es->p != NULL) && 
          (es->p->len <= tcp_sndbuf(tpcb)))
@@ -458,7 +458,7 @@ static void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_stru
 
     /* enqueue data for transmission */
     wr_err = tcp_write(tpcb, ptr->payload, ptr->len, 1);
-    
+    //printf("tcp_write:%d - %X\r\n",wr_err,ptr);
     if (wr_err == ERR_OK)
     {
       u16_t plen;
@@ -482,6 +482,7 @@ static void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_stru
         freed = pbuf_free(ptr);
       }
       while(freed == 0);
+      printf("freed:%X\r\n",ptr);
      /* we can read more data now */
      tcp_recved(tpcb, plen);
    }
