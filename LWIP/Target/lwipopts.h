@@ -48,7 +48,7 @@
 /* LwIP Stack Parameters (modified compared to initialization value in opt.h) -*/
 /* Parameters set in STM32CubeMX LwIP Configuration GUI -*/
 /*----- Value in opt.h for LWIP_DHCP: 0 -----*/
-#define LWIP_DHCP 1
+#define LWIP_DHCP 0
 /*----- Value in opt.h for NO_SYS: 0 -----*/
 #define NO_SYS 1
 /*----- Value in opt.h for SYS_LIGHTWEIGHT_PROT: 1 -----*/
@@ -101,7 +101,10 @@
 #define CHECKSUM_CHECK_ICMP6 0
 /*-----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */
-
+#define TCP_MSS	1000
+#define MEM_USE_POOLS 1
+#define MEMP_USE_CUSTOM_POOLS 1
+#define PBUF_POOL_SIZE                  30
 /* USER CODE END 1 */
 
 #ifdef __cplusplus

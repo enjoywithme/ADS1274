@@ -61,53 +61,8 @@ static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
 void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
 static void tcp_echoserver_connection_close(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es);
 
-err_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,unsigned short int len);
-static err_t tcp_echoserver_dataa_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
-static void check_recv_data(struct tcp_echoserver_struct *es);
-extern void ADS1274_tcp_send_data(void);
+static void check_recv_data(struct pbuf *p);
 
-
-//从一个接受的客户连接发送数据
-err_t tcp_echoserver_send_data(struct tcp_echoserver_struct *es,void *payload,u16_t len)
-{
-
-	struct tcp_pcb *tpcb = es->pcb;
-  err_t wr_err = ERR_OK;
-	
-	if(es==NULL || es->state!=ES_ACCEPTED)
-		return ERR_ARG;
-	
-	if(len>tcp_sndbuf(tpcb))
-		return ERR_BUF;
-	
-	//tcp_sent(tpcb, tcp_echoserver_dataa_sent);
-	wr_err = tcp_write(tpcb, payload, len, 1);
-	//if(wr_err != ERR_OK)
-		tcp_output(tpcb);
-	
-	return wr_err;
-
-
-}
-
-static err_t tcp_echoserver_dataa_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
-{
-  struct tcp_echoserver_struct *es;
-
-  LWIP_UNUSED_ARG(len);
-
-  es = (struct tcp_echoserver_struct *)arg;
-  es->retries = 0;
-  
-
-    /* if no more data to send and client closed connection*/
-    if(es->state == ES_CLOSING)
-      tcp_echoserver_connection_close(tpcb, es);
-		else
-			ADS1274_tcp_send_data();
-
-  return ERR_OK;
-}
 
 /**
   * @brief  Initializes the tcp echo server
@@ -210,14 +165,14 @@ static err_t tcp_echoserver_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
 }
 
 /*解析接收到的数据*/
-static void check_recv_data(struct tcp_echoserver_struct *es)
+static void check_recv_data(struct pbuf *p)
 {
 	unsigned char * payload;
 	
-	if(es->p->len<2)
+	if(p->len<2)
 		goto exit;
 	
-	payload = es->p->payload;
+	payload = p->payload;
 	printf("\r\ngot data\r\n");
 	printf(payload);	
 		
@@ -231,8 +186,7 @@ static void check_recv_data(struct tcp_echoserver_struct *es)
 		ad_start_flag = 0;
 	}	
 	exit:
-		pbuf_free(es->p);
-		es->p = NULL;
+		pbuf_free(p);
 }
 
 /**
@@ -289,17 +243,19 @@ static err_t tcp_echoserver_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p
     /* first data chunk in p->payload */
     //es->state = ES_RECEIVED; //只允许到ACCEPTED状态
     
+	 //检查收到的数据
+	 check_recv_data(p);
+
     /* store reference to incoming pbuf (chain) */
-    es->p = p;
+    //es->p = p;
     
     /* initialize LwIP tcp_sent callback function */
     tcp_sent(tpcb, tcp_echoserver_sent);
     
     /* send back the received data (echo) */
-    //tcp_echoserver_send(tpcb, es);
+    tcp_echoserver_send(tpcb, es);
+
 		
-		//检查收到的数据
-		check_recv_data(es);
     
     ret_err = ERR_OK;
   }
@@ -420,12 +376,12 @@ static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
 
   es = (struct tcp_echoserver_struct *)arg;
   es->retries = 0;
-  printf("sent:%d\r\n",len);
+  //printf("sent:%d\r\n",len);
   if(es->p != NULL)
   {
     /* still got pbufs to send */
     tcp_sent(tpcb, tcp_echoserver_sent);
-    //tcp_echoserver_send(tpcb, es);
+    tcp_echoserver_send(tpcb, es);
   }
   else
   {
@@ -443,6 +399,7 @@ static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
   * @param  es: pointer on echo_state structure
   * @retval None
   */
+uint16_t freeds=0;
  void tcp_echoserver_send(struct tcp_pcb *tpcb, struct tcp_echoserver_struct *es)
 {
   struct pbuf *ptr;
@@ -457,8 +414,10 @@ static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
     ptr = es->p;
 
     /* enqueue data for transmission */
+    tcp_output(tpcb);
     wr_err = tcp_write(tpcb, ptr->payload, ptr->len, 1);
-    //printf("tcp_write:%d - %X\r\n",wr_err,ptr);
+    printf("tcp_write:%d - %X\r\n",wr_err,ptr);
+
     if (wr_err == ERR_OK)
     {
       u16_t plen;
@@ -482,7 +441,8 @@ static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
         freed = pbuf_free(ptr);
       }
       while(freed == 0);
-      printf("freed:%X\r\n",ptr);
+      freeds+=freed;
+      printf("freed:%d - %X\r\n",freeds,ptr);
      /* we can read more data now */
      tcp_recved(tpcb, plen);
    }
@@ -497,6 +457,7 @@ static err_t tcp_echoserver_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
    }
   }
 }
+
 
 /**
   * @brief  This functions closes the tcp connection
@@ -517,10 +478,16 @@ static void tcp_echoserver_connection_close(struct tcp_pcb *tpcb, struct tcp_ech
   /* delete es structure */
   if (es != NULL)
   {
+	HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+
+	if(es->p!=NULL) pbuf_free(es->p);
     mem_free(es);
-		
-		//因为只有一个客户端链接，置空保存的客户端连接
-		client_es = NULL;
+
+	//因为只有一个客户端链接，置空保存的客户端连接
+	client_es = NULL;
+	ad_start_flag = 0;
+
+	printf("Client disconnected.\r\n");
   }  
   
   /* close tcp connection */

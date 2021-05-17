@@ -89,9 +89,10 @@ void MX_LWIP_Init(void)
   netif_set_link_callback(&gnetif, ethernetif_update_config);
 
   /* Create the Ethernet link handler thread */
-
+#ifdef USE_DHCP
   /* Start DHCP negotiation for a network interface (IPv4) */
   dhcp_start(&gnetif);
+#endif
 
 /* USER CODE BEGIN 3 */
 

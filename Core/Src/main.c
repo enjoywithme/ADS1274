@@ -132,20 +132,16 @@ int main(void)
     sys_check_timeouts();
 	
 
-#ifdef USE_DHCP
-    /* handle periodic timers for LwIP */
-    DHCP_Periodic_Handle(&gnetif);
-#endif 
-		
+
 		//停止或者启动AD
 		ADS1274_run();
 		
 		//ADS1274_read_once();
 		
 		//通过TCP发送数据
-//		uint8_t n;
-//		for(n=0;n<3;n++)
-			//ADS1274_tcp_send_data();
+		uint8_t n;
+		for(n=0;n<3;n++)
+			ADS1274_tcp_send_data();
 		
 		HAL_Delay(1);//没有这一行会因为开关中断不匹配导致1274总是被屏蔽，为什么？
   }
