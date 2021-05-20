@@ -42,10 +42,8 @@
 #include <stdio.h>
 #include <string.h>
 
+
 #if LWIP_TCP
-
-
-
 
 
 static struct tcp_pcb *tcp_echoserver_pcb;
@@ -63,6 +61,8 @@ static void tcp_echoserver_connection_close(struct tcp_pcb *tpcb, struct tcp_ech
 
 
 static void check_recv_data(struct tcp_echoserver_struct *es);
+
+
 
 
 

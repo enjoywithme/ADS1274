@@ -26,6 +26,7 @@
 
 extern uint8_t	ad_start_flag;
 extern void Debug_Int_Count(void);
+void ADS1274_Send_Data(void);
 void SystemClock_Config(void);
 
 
@@ -72,6 +73,8 @@ int main(void)
 	  ADS1274_run();
 
 	  Debug_Int_Count();
+
+	  ADS1274_Send_Data();
   }
 
 }
