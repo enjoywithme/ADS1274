@@ -41,11 +41,33 @@ uint32_t dma_rx=0;
 uint32_t dma_tx=0;
 uint32_t seconds=0;
 uint8_t reading=0;
+
+void Debug_Int_Count(void)
+{
+	uint32_t tick;
+	if(tickstart==0) tickstart = HAL_GetTick();
+	else
+	{
+		tick = HAL_GetTick();
+		if(tick-tickstart>1000)
+		{
+			seconds++;
+			printf("seconds=%d,tick=%d,ext9_int=%d,dma_rx=%d,dma_tx=%d\r\n",seconds,tick-tickstart,ext9_int,dma_rx,dma_tx);
+			tickstart =0;
+			dma_rx=0;
+			dma_tx=0;
+			ext9_int=0;
+		}
+	}
+}
+
 //#define RECV_DEBUG
 void DMA1_Stream0_IRQHandler(void)
 {
+	LL_DMA_DisableStream(DMA1, LL_DMA_STREAM_0);
 	LL_DMA_ClearFlag_TC0(DMA1);
 	HAL_NVIC_ClearPendingIRQ(DMA1_Stream0_IRQn);
+
 	dma_rx++;
 
 #ifdef RECV_DEBUG
@@ -67,29 +89,15 @@ printf("\r\n");
   */
 void DMA1_Stream5_IRQHandler(void)
 {
-	dma_tx++;
+
+	LL_DMA_DisableStream(DMA1, LL_DMA_STREAM_5);
 	LL_DMA_ClearFlag_TC5(DMA1);
 	HAL_NVIC_ClearPendingIRQ(DMA1_Stream5_IRQn);
-	LL_DMA_DisableStream(DMA1, LL_DMA_STREAM_0);
-	LL_DMA_DisableStream(DMA1, LL_DMA_STREAM_5);
+
 	LL_SPI_Disable(SPI3);
 
+	dma_tx++;
 
-	uint32_t tick;
-	if(tickstart==0) tickstart = HAL_GetTick();
-	else
-	{
-		tick = HAL_GetTick();
-		if(tick-tickstart>1000)
-		{
-			seconds++;
-			printf("seconds=%d,tick=%d,ext9_int=%d,dma_rx=%d,dma_tx=%d\r\n",seconds,tick-tickstart,ext9_int,dma_rx,dma_tx);
-			tickstart =0;
-			dma_rx=0;
-			dma_tx=0;
-			ext9_int=0;
-		}
-	}
 	//HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 	reading=0;
 }
@@ -115,9 +123,9 @@ void ADS1274_read_once(void)
 {
 	//if(reading==1) return;
 	//reading=1;
-	LL_DMA_SetMemoryAddress(DMA1,LL_DMA_STREAM_0,(uint32_t) spi_recv_data);
-
 	LL_DMA_SetChannelSelection(DMA1, LL_DMA_STREAM_0, LL_DMA_CHANNEL_0);
+	LL_DMA_SetMemoryAddress(DMA1,LL_DMA_STREAM_0,(uint32_t) spi_recv_data);
+	LL_DMA_SetDataLength(DMA1,LL_DMA_STREAM_0,SPI_BUFFER_SIZE);
 	LL_SPI_EnableDMAReq_RX(SPI3);
 	LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0);
 

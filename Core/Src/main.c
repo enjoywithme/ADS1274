@@ -22,9 +22,10 @@
 #include "lwip.h"
 #include "serial_debug.h"
 #include "data_sample.h"
-
+#include "tcp_echoserver.h"
 
 extern uint8_t	ad_start_flag;
+extern void Debug_Int_Count(void);
 void SystemClock_Config(void);
 
 
@@ -60,20 +61,19 @@ int main(void)
   /* Initialize all configured peripherals */
   ADS1274_Init();
   MX_LWIP_Init();
-  /* USER CODE BEGIN 2 */
+  tcp_echoserver_init();
 
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
   printf("Begin main loop\r\n");
-  ad_start_flag = 1;
+
   while (1)
   {
+	  MX_LWIP_Process();
+
 	  ADS1274_run();
 
+	  Debug_Int_Count();
   }
-  /* USER CODE END 3 */
+
 }
 
 /**
